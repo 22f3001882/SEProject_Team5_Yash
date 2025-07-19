@@ -26,4 +26,3 @@ with app.app_context():
     #     default_quiz = Quiz(chapter_id=1, remarks="This is a default quiz.",creation_date=datetime.strptime("01-01-2025", "%d-%m-%Y"), date_of_quiz = datetime.strptime("01-01-2025", "%d-%m-%Y"), time_duration= "00:00")
     #     db.session.add(default_quiz)
     db.session.commit()
-

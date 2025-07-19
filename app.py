@@ -22,7 +22,9 @@ def createApp():
     
     # Register API routes AFTER app context is created
     from resources.child_resources import child_api
+    from resources.parent_resources import parent_api
     child_api.init_app(app)
+    parent_api.init_app(app)
     
     return app
 

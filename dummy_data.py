@@ -1,439 +1,432 @@
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-from werkzeug.security import generate_password_hash
+"""
+Script to load dummy data for testing the child financial management system
+"""
+
+from app import app
+from models import *
+from flask_security import hash_password
 from datetime import datetime, date, timedelta
 import random
-from decimal import Decimal
 
-# Import your existing models (assuming they're in the same file or properly imported)
-
-from models import *
-
-def create_dummy_data():
-    """Create comprehensive dummy data for the school management system"""
+def clear_data():
+    """Clear existing data"""
+    print("Clearing existing data...")
     
-    # Clear existing data (optional - uncomment if you want to start fresh)
-    db.drop_all()
-    db.create_all()
-    
-    print("Creating dummy data...")
-    
-    # 1. Create Admin Users
-    admin_users = [
-        {
-            'name': 'John Administrator',
-            'email': 'admin@school.com',
-            'password': generate_password_hash('admin123'),
-            'role': 'admin'
-        },
-        {
-            'name': 'Sarah Manager',
-            'email': 'sarah.manager@school.com',
-            'password': generate_password_hash('manager123'),
-            'role': 'admin'
-        }
-    ]
-    
-    admin_objects = []
-    for admin_data in admin_users:
-        admin = User(**admin_data)
-        db.session.add(admin)
-        admin_objects.append(admin)
+    # Clear in reverse order of dependencies
+    ChallengeProgress.query.delete()
+    Challenge.query.delete()
+    NotesEncouragement.query.delete()
+    Spending.query.delete()
+    Goal.query.delete()
+    PocketMoneyLog.query.delete()
+    PocketMoneyPlace.query.delete()
+    PocketMoney.query.delete()
+    ParentChildLink.query.delete()
+    Child.query.delete()
+    Parent.query.delete()
+    Teacher.query.delete()
+    Class.query.delete()
+    School.query.delete()
+    UserRoles.query.delete()
+    User.query.delete()
+    Role.query.delete()
     
     db.session.commit()
-    print(f"Created {len(admin_objects)} admin users")
+    print("Data cleared!")
+
+def create_roles():
+    """Create basic roles"""
+    print("Creating roles...")
     
-    # 2. Create Schools
-    schools_data = [
-        {
-            'name': 'Greenwood Elementary School',
-            'address': '123 Oak Street, Springfield, IL 62701',
-            'user_id': admin_objects[0].id
-        },
-        {
-            'name': 'Riverside Middle School',
-            'address': '456 River Road, Springfield, IL 62702',
-            'user_id': admin_objects[1].id
-        }
+    roles = [
+        {'name': 'admin', 'description': 'Administrator'},
+        {'name': 'child', 'description': 'Child user'},
+        {'name': 'parent', 'description': 'Parent user'},
+        {'name': 'teacher', 'description': 'Teacher user'},
+        {'name': 'school', 'description': 'School administrator'}
     ]
     
-    school_objects = []
-    for school_data in schools_data:
-        school = School(**school_data)
-        db.session.add(school)
-        school_objects.append(school)
+    for role_data in roles:
+        role = Role(name=role_data['name'], description=role_data['description'])
+        db.session.add(role)
     
     db.session.commit()
-    print(f"Created {len(school_objects)} schools")
+    print("Roles created!")
+
+def create_schools_and_classes():
+    """Create dummy schools and classes"""
+    print("Creating schools and classes...")
     
-    # 3. Create Teacher Users and Teacher records
-    teacher_users_data = [
-        {'name': 'Emily Johnson', 'email': 'emily.johnson@school.com', 'role': 'teacher'},
-        {'name': 'Michael Brown', 'email': 'michael.brown@school.com', 'role': 'teacher'},
-        {'name': 'Lisa Davis', 'email': 'lisa.davis@school.com', 'role': 'teacher'},
-        {'name': 'Robert Wilson', 'email': 'robert.wilson@school.com', 'role': 'teacher'},
-        {'name': 'Jennifer Garcia', 'email': 'jennifer.garcia@school.com', 'role': 'teacher'},
-        {'name': 'David Miller', 'email': 'david.miller@school.com', 'role': 'teacher'}
+    # Create school admin user
+    school_user = User(
+        email='greenwood@school.com',
+        password=hash_password('password123'),
+        name='Greenwood Elementary',
+        fs_uniquifier='school1',
+        active=True
+    )
+    db.session.add(school_user)
+    db.session.flush()
+    
+    # Assign school role
+    school_role = Role.query.filter_by(name='school').first()
+    user_role = UserRoles(user_id=school_user.id, role_id=school_role.id)
+    db.session.add(user_role)
+    
+    # Create school
+    school = School(
+        name='Greenwood Elementary School',
+        address='123 Education Street, Learning City',
+        user_id=school_user.id
+    )
+    db.session.add(school)
+    db.session.flush()
+    
+    # Create teacher user
+    teacher_user = User(
+        email='ms.johnson@school.com',
+        password=hash_password('password123'),
+        name='Ms. Sarah Johnson',
+        fs_uniquifier='teacher1',
+        active=True
+    )
+    db.session.add(teacher_user)
+    db.session.flush()
+    
+    # Assign teacher role
+    teacher_role = Role.query.filter_by(name='teacher').first()
+    user_role = UserRoles(user_id=teacher_user.id, role_id=teacher_role.id)
+    db.session.add(user_role)
+    
+    # Create teacher
+    teacher = Teacher(
+        user_id=teacher_user.id,
+        school_id=school.id
+    )
+    db.session.add(teacher)
+    db.session.flush()
+    
+    # Create class
+    class_obj = Class(
+        name='Grade 5A',
+        teacher_id=teacher.id,
+        school_id=school.id
+    )
+    db.session.add(class_obj)
+    db.session.commit()
+    
+    print("Schools and classes created!")
+    return class_obj.id
+
+def create_parents():
+    """Create dummy parents"""
+    print("Creating parents...")
+    
+    parents_data = [
+        {'email': 'john.smith@email.com', 'name': 'John Smith'},
+        {'email': 'mary.doe@email.com', 'name': 'Mary Doe'},
+        {'email': 'david.brown@email.com', 'name': 'David Brown'},
+        {'email': 'lisa.wilson@email.com', 'name': 'Lisa Wilson'},
     ]
     
-    teacher_user_objects = []
-    for teacher_data in teacher_users_data:
-        teacher_data['password'] = generate_password_hash('teacher123')
-        teacher_user = User(**teacher_data)
-        db.session.add(teacher_user)
-        teacher_user_objects.append(teacher_user)
+    parent_ids = []
+    parent_role = Role.query.filter_by(name='parent').first()
     
-    db.session.commit()
-    
-    # Create Teacher records
-    teacher_objects = []
-    for i, teacher_user in enumerate(teacher_user_objects):
-        teacher = Teacher(
-            user_id=teacher_user.id,
-            school_id=school_objects[i % len(school_objects)].id
+    for i, parent_data in enumerate(parents_data):
+        # Create user
+        user = User(
+            email=parent_data['email'],
+            password=hash_password('password123'),
+            name=parent_data['name'],
+            fs_uniquifier=f'parent{i+1}',
+            active=True
         )
-        db.session.add(teacher)
-        teacher_objects.append(teacher)
-    
-    db.session.commit()
-    print(f"Created {len(teacher_objects)} teachers")
-    
-    # 4. Create Classes
-    classes_data = [
-        {'name': '1st Grade A', 'teacher_id': teacher_objects[0].id, 'school_id': school_objects[0].id},
-        {'name': '1st Grade B', 'teacher_id': teacher_objects[1].id, 'school_id': school_objects[0].id},
-        {'name': '2nd Grade A', 'teacher_id': teacher_objects[2].id, 'school_id': school_objects[0].id},
-        {'name': '6th Grade A', 'teacher_id': teacher_objects[3].id, 'school_id': school_objects[1].id},
-        {'name': '7th Grade A', 'teacher_id': teacher_objects[4].id, 'school_id': school_objects[1].id},
-        {'name': '8th Grade A', 'teacher_id': teacher_objects[5].id, 'school_id': school_objects[1].id}
-    ]
-    
-    class_objects = []
-    for class_data in classes_data:
-        class_obj = Class(**class_data)
-        db.session.add(class_obj)
-        class_objects.append(class_obj)
-    
-    db.session.commit()
-    print(f"Created {len(class_objects)} classes")
-    
-    # 5. Create Parent Users and Parent records
-    parent_users_data = [
-        {'name': 'Mark Thompson', 'email': 'mark.thompson@email.com', 'role': 'parent'},
-        {'name': 'Susan Thompson', 'email': 'susan.thompson@email.com', 'role': 'parent'},
-        {'name': 'James Rodriguez', 'email': 'james.rodriguez@email.com', 'role': 'parent'},
-        {'name': 'Maria Rodriguez', 'email': 'maria.rodriguez@email.com', 'role': 'parent'},
-        {'name': 'Tom Anderson', 'email': 'tom.anderson@email.com', 'role': 'parent'},
-        {'name': 'Rachel Anderson', 'email': 'rachel.anderson@email.com', 'role': 'parent'},
-        {'name': 'Kevin Lee', 'email': 'kevin.lee@email.com', 'role': 'parent'},
-        {'name': 'Amy Lee', 'email': 'amy.lee@email.com', 'role': 'parent'},
-        {'name': 'Steve Martin', 'email': 'steve.martin@email.com', 'role': 'parent'},
-        {'name': 'Linda Martin', 'email': 'linda.martin@email.com', 'role': 'parent'}
-    ]
-    
-    parent_user_objects = []
-    for parent_data in parent_users_data:
-        parent_data['password'] = generate_password_hash('parent123')
-        parent_user = User(**parent_data)
-        db.session.add(parent_user)
-        parent_user_objects.append(parent_user)
-    
-    db.session.commit()
-    
-    # Create Parent records
-    parent_objects = []
-    for parent_user in parent_user_objects:
-        parent = Parent(user_id=parent_user.id)
+        db.session.add(user)
+        db.session.flush()
+        
+        # Assign role
+        user_role = UserRoles(user_id=user.id, role_id=parent_role.id)
+        db.session.add(user_role)
+        
+        # Create parent profile
+        parent = Parent(user_id=user.id)
         db.session.add(parent)
-        parent_objects.append(parent)
+        db.session.flush()
+        
+        parent_ids.append(parent.id)
     
     db.session.commit()
-    print(f"Created {len(parent_objects)} parents")
+    print("Parents created!")
+    return parent_ids
+
+def create_children(class_id, parent_ids):
+    """Create dummy children"""
+    print("Creating children...")
     
-    # 6. Create Child Users and Child records
-    child_users_data = [
-        {'name': 'Emma Thompson', 'email': 'emma.thompson@email.com', 'role': 'child'},
-        {'name': 'Liam Thompson', 'email': 'liam.thompson@email.com', 'role': 'child'},
-        {'name': 'Sofia Rodriguez', 'email': 'sofia.rodriguez@email.com', 'role': 'child'},
-        {'name': 'Noah Anderson', 'email': 'noah.anderson@email.com', 'role': 'child'},
-        {'name': 'Olivia Anderson', 'email': 'olivia.anderson@email.com', 'role': 'child'},
-        {'name': 'Ethan Lee', 'email': 'ethan.lee@email.com', 'role': 'child'},
-        {'name': 'Ava Lee', 'email': 'ava.lee@email.com', 'role': 'child'},
-        {'name': 'Mason Martin', 'email': 'mason.martin@email.com', 'role': 'child'},
-        {'name': 'Isabella Martin', 'email': 'isabella.martin@email.com', 'role': 'child'}
+    children_data = [
+        {'email': 'alex.smith@email.com', 'name': 'Alex Smith', 'balance': 45.50},
+        {'email': 'emma.doe@email.com', 'name': 'Emma Doe', 'balance': 32.75},
+        {'email': 'noah.brown@email.com', 'name': 'Noah Brown', 'balance': 18.25},
+        {'email': 'sophie.wilson@email.com', 'name': 'Sophie Wilson', 'balance': 67.00},
     ]
     
-    child_user_objects = []
-    for child_data in child_users_data:
-        child_data['password'] = generate_password_hash('child123')
-        child_user = User(**child_data)
-        db.session.add(child_user)
-        child_user_objects.append(child_user)
+    child_ids = []
+    child_role = Role.query.filter_by(name='child').first()
     
-    db.session.commit()
-    
-    # Create Child records
-    child_objects = []
-    for i, child_user in enumerate(child_user_objects):
+    for i, child_data in enumerate(children_data):
+        # Create user
+        user = User(
+            email=child_data['email'],
+            password=hash_password('password123'),
+            name=child_data['name'],
+            fs_uniquifier=f'child{i+1}',
+            active=True
+        )
+        db.session.add(user)
+        db.session.flush()
+        
+        # Assign role
+        user_role = UserRoles(user_id=user.id, role_id=child_role.id)
+        db.session.add(user_role)
+        
+        # Create child profile
         child = Child(
-            user_id=child_user.id,
-            class_id=class_objects[i % len(class_objects)].id,
-            total_balance=Decimal(str(random.uniform(10, 100)))
+            user_id=user.id,
+            class_id=class_id,
+            total_balance=child_data['balance']
         )
         db.session.add(child)
-        child_objects.append(child)
+        db.session.flush()
+        
+        child_ids.append(child.id)
+        
+        # Link to parent
+        if i < len(parent_ids):
+            parent_link = ParentChildLink(
+                parent_id=parent_ids[i],
+                child_id=child.id,
+                primary=True
+            )
+            db.session.add(parent_link)
     
     db.session.commit()
-    print(f"Created {len(child_objects)} children")
+    print("Children created!")
+    return child_ids
+
+def create_goals(child_ids):
+    """Create dummy goals"""
+    print("Creating goals...")
     
-    # 7. Create Parent-Child Links
-    parent_child_links = [
-        # Thompson family
-        {'parent_id': parent_objects[0].id, 'child_id': child_objects[0].id, 'primary': True},
-        {'parent_id': parent_objects[1].id, 'child_id': child_objects[0].id, 'primary': False},
-        {'parent_id': parent_objects[0].id, 'child_id': child_objects[1].id, 'primary': True},
-        {'parent_id': parent_objects[1].id, 'child_id': child_objects[1].id, 'primary': False},
-        # Rodriguez family
-        {'parent_id': parent_objects[2].id, 'child_id': child_objects[2].id, 'primary': True},
-        {'parent_id': parent_objects[3].id, 'child_id': child_objects[2].id, 'primary': False},
-        # Anderson family
-        {'parent_id': parent_objects[4].id, 'child_id': child_objects[3].id, 'primary': True},
-        {'parent_id': parent_objects[5].id, 'child_id': child_objects[3].id, 'primary': False},
-        {'parent_id': parent_objects[4].id, 'child_id': child_objects[4].id, 'primary': True},
-        {'parent_id': parent_objects[5].id, 'child_id': child_objects[4].id, 'primary': False},
-        # Lee family
-        {'parent_id': parent_objects[6].id, 'child_id': child_objects[5].id, 'primary': True},
-        {'parent_id': parent_objects[7].id, 'child_id': child_objects[5].id, 'primary': False},
-        {'parent_id': parent_objects[6].id, 'child_id': child_objects[6].id, 'primary': True},
-        {'parent_id': parent_objects[7].id, 'child_id': child_objects[6].id, 'primary': False},
-        # Martin family
-        {'parent_id': parent_objects[8].id, 'child_id': child_objects[7].id, 'primary': True},
-        {'parent_id': parent_objects[9].id, 'child_id': child_objects[7].id, 'primary': False},
-        {'parent_id': parent_objects[8].id, 'child_id': child_objects[8].id, 'primary': True},
-        {'parent_id': parent_objects[9].id, 'child_id': child_objects[8].id, 'primary': False}
+    goals_data = [
+        {'title': 'New Bicycle', 'amount': 150.00, 'days_ahead': 30},
+        {'title': 'Video Game', 'amount': 60.00, 'days_ahead': 15},
+        {'title': 'Art Supplies', 'amount': 25.00, 'days_ahead': 10},
+        {'title': 'School Trip', 'amount': 45.00, 'days_ahead': 20},
+        {'title': 'Birthday Gift for Mom', 'amount': 30.00, 'days_ahead': 25},
     ]
     
-    for link_data in parent_child_links:
-        link = ParentChildLink(**link_data)
-        db.session.add(link)
-    
-    db.session.commit()
-    print(f"Created {len(parent_child_links)} parent-child links")
-    
-    # 8. Create Pocket Money records
-    pocket_money_records = []
-    for i, child in enumerate(child_objects):
-        # Each child gets 2-3 pocket money records
-        for j in range(random.randint(2, 3)):
-            pocket_money = PocketMoney(
-                child_id=child.id,
-                parent_id=parent_objects[i * 2].id,  # Primary parent
-                amount=Decimal(str(random.uniform(5, 25))),
-                date_given=date.today() - timedelta(days=random.randint(1, 30)),
-                recurring=random.choice([True, False]),
-                recurring_schedule=random.choice(['weekly', 'monthly', None]),
-                stored_in=random.choice(['wallet', 'piggy_bank', 'savings_account'])
-            )
-            db.session.add(pocket_money)
-            pocket_money_records.append(pocket_money)
-    
-    db.session.commit()
-    print(f"Created {len(pocket_money_records)} pocket money records")
-    
-    # 9. Create Pocket Money Logs
-    pocket_money_logs = []
-    for child in child_objects:
-        for _ in range(random.randint(5, 10)):
-            log = PocketMoneyLog(
-                child_id=child.id,
-                amount=Decimal(str(random.uniform(1, 20))),
-                date=date.today() - timedelta(days=random.randint(1, 60)),
-                source=random.choice(['allowance', 'chores', 'gift', 'birthday', 'good_grades']),
-                destination=random.choice(['spent', 'saved', 'donated', 'invested'])
-            )
-            db.session.add(log)
-            pocket_money_logs.append(log)
-    
-    db.session.commit()
-    print(f"Created {len(pocket_money_logs)} pocket money logs")
-    
-    # 10. Create Pocket Money Places
-    pocket_money_places = []
-    for child in child_objects:
-        places = ['piggy_bank', 'wallet', 'savings_account', 'jar']
-        for place in random.sample(places, random.randint(2, 3)):
-            pmp = PocketMoneyPlace(
-                child_id=child.id,
-                name=place,
-                amount_stored=Decimal(str(random.uniform(5, 50)))
-            )
-            db.session.add(pmp)
-            pocket_money_places.append(pmp)
-    
-    db.session.commit()
-    print(f"Created {len(pocket_money_places)} pocket money places")
-    
-    # 11. Create Goals
-    goals = []
-    goal_titles = [
-        'New Bicycle', 'Nintendo Switch', 'Art Supplies', 'Save for College',
-        'New Books', 'Toy Robot', 'Skateboard', 'Video Game', 'Lego Set',
-        'Musical Instrument', 'Sports Equipment', 'Tablet'
-    ]
-    
-    for child in child_objects:
-        for _ in range(random.randint(1, 3)):
+    for child_id in child_ids:
+        # Create 1-2 goals per child
+        num_goals = random.randint(1, 2)
+        selected_goals = random.sample(goals_data, num_goals)
+        
+        for goal_data in selected_goals:
             goal = Goal(
-                child_id=child.id,
-                title=random.choice(goal_titles),
-                amount=Decimal(str(random.uniform(20, 200))),
-                deadline=date.today() + timedelta(days=random.randint(30, 365)),
-                status=random.choice(['active', 'completed', 'cancelled'])
+                child_id=child_id,
+                title=goal_data['title'],
+                amount=goal_data['amount'],
+                deadline=date.today() + timedelta(days=goal_data['days_ahead']),
+                status='active'
             )
             db.session.add(goal)
-            goals.append(goal)
     
     db.session.commit()
-    print(f"Created {len(goals)} goals")
+    print("Goals created!")
+
+def create_spending_records(child_ids):
+    """Create dummy spending records"""
+    print("Creating spending records...")
     
-    # 12. Create Spendings
-    spendings = []
-    spending_categories = [
-        'Toys', 'Candy', 'Books', 'Games', 'Clothes', 'Food', 'Electronics',
-        'Sports', 'Art Supplies', 'Music', 'Movies', 'Gifts'
-    ]
+    categories = ['Food & Drinks', 'Toys & Games', 'Books', 'Clothes', 'Entertainment', 'Other']
     
-    for child in child_objects:
-        for _ in range(random.randint(3, 8)):
+    for child_id in child_ids:
+        # Create 3-8 spending records per child
+        num_records = random.randint(3, 8)
+        
+        for _ in range(num_records):
+            spend_date = date.today() - timedelta(days=random.randint(1, 30))
+            amount = round(random.uniform(2.50, 15.00), 2)
+            category = random.choice(categories)
+            
+            descriptions = {
+                'Food & Drinks': ['Snack at school', 'Ice cream', 'Juice box', 'Candy'],
+                'Toys & Games': ['Small toy', 'Trading cards', 'Puzzle', 'Ball'],
+                'Books': ['Comic book', 'Storybook', 'Magazine', 'Notebook'],
+                'Clothes': ['Socks', 'Hair accessory', 'Stickers', 'Badge'],
+                'Entertainment': ['Movie ticket', 'Arcade game', 'Mini golf', 'Bowling'],
+                'Other': ['Gift for friend', 'Charity donation', 'School supplies', 'Miscellaneous']
+            }
+            
+            description = random.choice(descriptions[category])
+            
             spending = Spending(
-                child_id=child.id,
-                category=random.choice(spending_categories),
-                amount=Decimal(str(random.uniform(1, 25))),
-                spend_date=date.today() - timedelta(days=random.randint(1, 30)),
-                description=f"Bought {random.choice(['something cool', 'a nice item', 'a fun thing'])}"
+                child_id=child_id,
+                category=category,
+                amount=amount,
+                spend_date=spend_date,
+                description=description
             )
             db.session.add(spending)
-            spendings.append(spending)
     
     db.session.commit()
-    print(f"Created {len(spendings)} spending records")
+    print("Spending records created!")
+
+def create_money_places(child_ids):
+    """Create dummy money storage places"""
+    print("Creating money storage places...")
     
-    # 13. Create Challenges
+    place_names = ['Piggy Bank', 'Wallet', 'Savings Jar', 'Bank Account', 'Secret Box']
+    
+    for child_id in child_ids:
+        # Create 2-3 money places per child
+        num_places = random.randint(2, 3)
+        selected_places = random.sample(place_names, num_places)
+        
+        child = Child.query.get(child_id)
+        total_balance = float(child.total_balance)
+        
+        for i, place_name in enumerate(selected_places):
+            # Distribute balance across places
+            if i == len(selected_places) - 1:
+                # Last place gets remaining balance
+                amount = total_balance
+            else:
+                # Random portion of remaining balance
+                max_amount = total_balance * 0.6
+                amount = round(random.uniform(0, max_amount), 2)
+                total_balance -= amount
+            
+            place = PocketMoneyPlace(
+                child_id=child_id,
+                name=place_name,
+                amount_stored=amount
+            )
+            db.session.add(place)
+    
+    db.session.commit()
+    print("Money storage places created!")
+
+def create_challenges():
+    """Create dummy challenges"""
+    print("Creating challenges...")
+    
     challenges_data = [
         {
-            'title': 'Save $50 Challenge',
-            'description': 'Save $50 in your piggy bank within 2 months',
-            'reward': 'Extra $10 bonus',
-            'ends_on': datetime.now() + timedelta(days=60)
+            'title': 'Save $10 This Week',
+            'description': 'Try to save at least $10 by the end of this week!',
+            'reward': 'Extra $2 bonus',
+            'days_ahead': 7
         },
         {
-            'title': 'Chores Champion',
-            'description': 'Complete all your chores for 4 weeks straight',
-            'reward': 'Choose a family movie night',
-            'ends_on': datetime.now() + timedelta(days=28)
+            'title': 'Track Every Spend',
+            'description': 'Record every single purchase you make for one week.',
+            'reward': 'Financial tracking badge',
+            'days_ahead': 14
         },
         {
-            'title': 'Reading Marathon',
-            'description': 'Read 10 books this month',
-            'reward': 'New book of your choice',
-            'ends_on': datetime.now() + timedelta(days=30)
+            'title': 'Compare Prices',
+            'description': 'Before buying something, find and compare prices from 3 different places.',
+            'reward': 'Smart shopper certificate',
+            'days_ahead': 21
         },
         {
-            'title': 'Healthy Eating Week',
-            'description': 'Eat fruits and vegetables every day for a week',
-            'reward': '$5 bonus allowance',
-            'ends_on': datetime.now() + timedelta(days=7)
+            'title': 'Help with Chores',
+            'description': 'Complete 5 extra chores to earn additional pocket money.',
+            'reward': '$5 bonus',
+            'days_ahead': 10
         }
     ]
     
-    challenge_objects = []
     for challenge_data in challenges_data:
-        challenge = Challenge(**challenge_data)
+        challenge = Challenge(
+            title=challenge_data['title'],
+            description=challenge_data['description'],
+            reward=challenge_data['reward'],
+            created_on=datetime.now(),
+            ends_on=datetime.now() + timedelta(days=challenge_data['days_ahead'])
+        )
         db.session.add(challenge)
-        challenge_objects.append(challenge)
     
     db.session.commit()
-    print(f"Created {len(challenge_objects)} challenges")
-    
-    # 14. Create Challenge Progress
-    challenge_progress = []
-    for child in child_objects:
-        # Each child participates in 1-3 challenges
-        for challenge in random.sample(challenge_objects, random.randint(1, 3)):
-            progress = ChallengeProgress(
-                child_id=child.id,
-                challenge_id=challenge.id,
-                status=random.choice(['started', 'completed', 'abandoned'])
-            )
-            db.session.add(progress)
-            challenge_progress.append(progress)
-    
-    db.session.commit()
-    print(f"Created {len(challenge_progress)} challenge progress records")
-    
-    # 15. Create Notes of Encouragement
-    notes = []
-    encouragement_messages = [
-        "Great job on saving money this week!",
-        "I'm proud of how responsible you're being with your allowance.",
-        "Keep up the good work with your chores!",
-        "You're doing amazing with your savings goal!",
-        "I noticed you've been very careful with your spending. Well done!",
-        "Your hard work is paying off. Keep it up!",
-        "You're learning so much about money management!",
-        "I'm impressed by your dedication to your goals."
-    ]
-    
-    # Parents and teachers send notes to children
-    all_senders = parent_user_objects + teacher_user_objects
-    
-    for child in child_objects:
-        for _ in range(random.randint(2, 5)):
-            note = NotesEncouragement(
-                sender_id=random.choice(all_senders).id,
-                child_id=child.id,
-                message=random.choice(encouragement_messages),
-                date_sent=datetime.now() - timedelta(days=random.randint(1, 30))
-            )
-            db.session.add(note)
-            notes.append(note)
-    
-    db.session.commit()
-    print(f"Created {len(notes)} encouragement notes")
-    
-    print("\n=== DUMMY DATA CREATION COMPLETE ===")
-    print(f"Total records created:")
-    print(f"- Users: {len(admin_objects) + len(teacher_user_objects) + len(parent_user_objects) + len(child_user_objects)}")
-    print(f"- Schools: {len(school_objects)}")
-    print(f"- Teachers: {len(teacher_objects)}")
-    print(f"- Classes: {len(class_objects)}")
-    print(f"- Parents: {len(parent_objects)}")
-    print(f"- Children: {len(child_objects)}")
-    print(f"- Parent-Child Links: {len(parent_child_links)}")
-    print(f"- Pocket Money Records: {len(pocket_money_records)}")
-    print(f"- Pocket Money Logs: {len(pocket_money_logs)}")
-    print(f"- Pocket Money Places: {len(pocket_money_places)}")
-    print(f"- Goals: {len(goals)}")
-    print(f"- Spendings: {len(spendings)}")
-    print(f"- Challenges: {len(challenge_objects)}")
-    print(f"- Challenge Progress: {len(challenge_progress)}")
-    print(f"- Encouragement Notes: {len(notes)}")
-    
-    print("\n=== LOGIN CREDENTIALS ===")
-    print("Admins:")
-    print("- admin@school.com / admin123")
-    print("- sarah.manager@school.com / manager123")
-    print("\nTeachers:")
-    for teacher in teacher_users_data:
-        print(f"- {teacher['email']} / teacher123")
-    print("\nParents:")
-    for parent in parent_users_data:
-        print(f"- {parent['email']} / parent123")
-    print("\nChildren:")
-    for child in child_users_data:
-        print(f"- {child['email']} / child123")
+    print("Challenges created!")
 
-if __name__ == "__main__":
-    # Make sure to run this with your Flask app context
+def create_pocket_money_logs(child_ids, parent_ids):
+    """Create dummy pocket money logs"""
+    print("Creating pocket money logs...")
+    
+    sources = ['Weekly allowance', 'Chores', 'Birthday gift', 'Good grades bonus', 'Extra help']
+    destinations = ['Piggy Bank', 'Wallet', 'Savings Account', 'Spending money']
+    
+    for child_id in child_ids:
+        # Create 2-5 pocket money logs per child
+        num_logs = random.randint(2, 5)
+        
+        for _ in range(num_logs):
+            log_date = date.today() - timedelta(days=random.randint(1, 30))
+            amount = round(random.uniform(5.00, 25.00), 2)
+            
+            log = PocketMoneyLog(
+                child_id=child_id,
+                amount=amount,
+                date=log_date,
+                source=random.choice(sources),
+                destination=random.choice(destinations)
+            )
+            db.session.add(log)
+    
+    db.session.commit()
+    print("Pocket money logs created!")
+
+def main():
+    """Main function to load all dummy data"""
     with app.app_context():
-        create_dummy_data()
+        print("Starting dummy data loading...")
+        
+        # Clear existing data
+        clear_data()
+        
+        # Create base data
+        create_roles()
+        class_id = create_schools_and_classes()
+        parent_ids = create_parents()
+        child_ids = create_children(class_id, parent_ids)
+        
+        # Create child-related data
+        create_goals(child_ids)
+        create_spending_records(child_ids)
+        create_money_places(child_ids)
+        create_challenges()
+        create_pocket_money_logs(child_ids, parent_ids)
+        
+        print("\n" + "="*50)
+        print("DUMMY DATA LOADED SUCCESSFULLY!")
+        print("="*50)
+        print("\nTest Login Credentials:")
+        print("\nChildren:")
+        print("  alex.smith@email.com / password123")
+        print("  emma.doe@email.com / password123")
+        print("  noah.brown@email.com / password123")
+        print("  sophie.wilson@email.com / password123")
+        print("\nParents:")
+        print("  john.smith@email.com / password123")
+        print("  mary.doe@email.com / password123")
+        print("  david.brown@email.com / password123")
+        print("  lisa.wilson@email.com / password123")
+        print("\nTeacher:")
+        print("  ms.johnson@school.com / password123")
+        print("\nSchool:")
+        print("  greenwood@school.com / password123")
+        print("\n" + "="*50)
+
+if __name__ == '__main__':
+    main()
