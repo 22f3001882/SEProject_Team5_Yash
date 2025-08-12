@@ -2,8 +2,14 @@ from flask import current_app as app, jsonify, render_template, request, send_fi
 from flask_security import auth_required, verify_password, hash_password, current_user
 from models import db
 from datetime import datetime
-# from backend.celery.tasks import add, create_quiz_csv
-# from celery.result import AsyncResult
+from backend_celery.tasks import (
+    create_child_financial_report,
+    send_daily_spending_reminders,
+    send_weekly_spending_reminders,
+    send_weekly_parent_summaries,
+    process_recurring_allowances
+)
+from celery.result import AsyncResult
 
 datastore = app.security.datastore
 cache = app.cache
@@ -20,32 +26,47 @@ def home():
 #     task = add.delay(50,60)
 #     return {'task_id': task.id}, 200
 
-# @app.get('/get-celery-data/<id>')
-# def getCeleryData(id):
-#     result = AsyncResult(id)
 
-#     if result.ready():
-#         return {'result':result.result}
-#     else:
-#         return {'message':'task aint ready yet'}, 405
 
-# -------------------------------
+@app.route('/trigger-daily-reminders')
+@auth_required('token')
+def trigger_daily_reminders():
+    """Manually trigger daily spending reminders (for testing/admin)"""
+    if 'admin' not in current_user.roles:
+        return {'message': 'Not authorized'}, 403
+    
+    task = send_daily_spending_reminders.delay()
+    return {'task_id': task.id, 'message': 'Daily reminders triggered'}, 200
 
-# @app.route('/create-quiz-csv')
-# @auth_required('token')
-# def createQuizCSV():
-#     task = create_quiz_csv.delay(current_user.id)
-#     return {'task_id': task.id}, 200
+@app.route('/trigger-weekly-reminders')
+@auth_required('token')
+def trigger_weekly_reminders():
+    """Manually trigger weekly spending reminders (for testing/admin)"""
+    if 'admin' not in current_user.roles:
+        return {'message': 'Not authorized'}, 403
+    
+    task = send_weekly_spending_reminders.delay()
+    return {'task_id': task.id, 'message': 'Weekly reminders triggered'}, 200
 
-# @app.get('/get-quiz-csv/<id>')
-# def getQuizData(id):
-#     result = AsyncResult(id)
-#     if result.ready():
-#         if (result.result) == None:
-#             return {'message':'No quiz'}, 405
-#         return send_file('./backend/celery/user-downloads/'+str(result.result)), 200
-#     else:
-#         return {'message':'task aint ready yet'}, 405
+@app.route('/trigger-parent-summaries')
+@auth_required('token')
+def trigger_parent_summaries():
+    """Manually trigger weekly parent summaries (for testing/admin)"""
+    if 'admin' not in current_user.roles:
+        return {'message': 'Not authorized'}, 403
+    
+    task = send_weekly_parent_summaries.delay()
+    return {'task_id': task.id, 'message': 'Parent summaries triggered'}, 200
+
+@app.route('/trigger-recurring-allowances')
+@auth_required('token')
+def trigger_recurring_allowances():
+    """Manually trigger recurring allowances processing (for testing/admin)"""
+    if 'admin' not in current_user.roles:
+        return {'message': 'Not authorized'}, 403
+    
+    task = process_recurring_allowances.delay()
+    return {'task_id': task.id, 'message': 'Recurring allowances processing triggered'}, 200
 
 # ----------------------------------------------
 

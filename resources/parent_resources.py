@@ -9,6 +9,7 @@ from flask_security import auth_required, current_user
 from datetime import datetime, date, timedelta
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func, desc
+from decimal import Decimal
 
 cache = app.cache
 parent_api = Api(prefix='/api/parent')
@@ -447,7 +448,44 @@ class AllowanceApi(Resource):
     @auth_required('token')
     @marshal_with(allowance_fields)
     def post(self):
+        print("Inside POST method")
         return self.create_allowance()
+
+    @auth_required('token')
+    def patch(self, allowance_id):
+        """Update an allowance's recurring status"""
+        # Ensure parent role
+        if 'parent' not in current_user.roles:
+            return {'message': 'Not authorized'}, 403
+
+        # Find the parent object
+        parent = Parent.query.filter_by(user_id=current_user.id).first()
+        if not parent:
+            return {'message': 'Parent profile not found'}, 404
+
+        # Find the allowance
+        allowance = PocketMoney.query.get(allowance_id)
+        if not allowance or allowance.parent_id != parent.id:
+            return {'message': 'Allowance not found or not authorized'}, 404
+
+        # Get request data
+        data = request.get_json()
+        if not data or 'recurring' not in data:
+            return {'message': 'No recurring status provided'}, 400
+
+        # Update recurring status
+        allowance.recurring = bool(data['recurring'])
+        if not allowance.recurring:
+            allowance.recurring_schedule = None  # Optional: clear schedule
+
+        db.session.commit()
+
+        return {
+            'message': 'Allowance updated successfully',
+            'id': allowance.id,
+            'recurring': allowance.recurring,
+            'recurring_schedule': allowance.recurring_schedule
+        }, 200
 
     def fetch_all_allowances(self):
         """Get all allowances given by current parent"""
@@ -508,18 +546,20 @@ class AllowanceApi(Resource):
                 stored_in=data.get('stored_in')
             )
 
-            # Update child's balance
+            # Get child and update balance
             child = Child.query.get(data['child_id'])
             if child:
-                child.total_balance += float(data['amount'])
+                child.total_balance += Decimal(str(data['amount']))
+
 
             db.session.add(allowance)
             db.session.commit()
 
+            # Return using the `child` object we already fetched
             return {
                 'id': allowance.id,
                 'child_id': allowance.child_id,
-                'child_name': allowance.child.user_account.name if allowance.child and allowance.child.user_account else None,
+                'child_name': child.user_account.name if child and child.user_account else None,
                 'amount': float(allowance.amount),
                 'date_given': allowance.date_given.isoformat(),
                 'recurring': allowance.recurring,
@@ -529,7 +569,9 @@ class AllowanceApi(Resource):
 
         except Exception as e:
             db.session.rollback()
+            import traceback; traceback.print_exc()
             return {'message': f'Error creating allowance: {str(e)}'}, 400
+
 
     def _check_child_access(self, child_id):
         """Check if current user has access to this child"""
@@ -760,7 +802,12 @@ class MessageApi(Resource):
 parent_api.add_resource(ChildrenApi, '/children')
 parent_api.add_resource(ChildApi, '/children/<int:child_id>')
 parent_api.add_resource(ChildOverviewApi, '/children/<int:child_id>/overview')
-parent_api.add_resource(AllowanceApi, '/allowances')
+
+parent_api.add_resource(
+    AllowanceApi,
+    '/allowances',              # for GET, POST
+    '/allowances/<int:allowance_id>'  # for PATCH
+)
 parent_api.add_resource(AllowanceHistoryApi, '/allowances/history')
 parent_api.add_resource(ReportSummaryApi, '/reports/summary')
 parent_api.add_resource(MessageApi, '/messages')

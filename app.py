@@ -1,4 +1,5 @@
 from flask import Flask
+from backend_celery.celery_factory import celery_init_app
 from config import LocalDevelopment
 from models import db, User, Role
 from flask_security import Security, SQLAlchemyUserDatastore, auth_required
@@ -23,17 +24,23 @@ def createApp():
     # Register API routes AFTER app context is created
     from resources.child_resources import child_api
     from resources.parent_resources import parent_api
+    from resources.admin_resources import admin_api
+    from resources.school_resources import school_api
+    from resources.teacher_resources import teacher_api
     child_api.init_app(app)
     parent_api.init_app(app)
+    admin_api.init_app(app)
+    school_api.init_app(app)
+    teacher_api.init_app(app)
     
     return app
 
 # Create app instance
 app = createApp()
-
+celery_app = celery_init_app(app)
 # Import other modules that need app context
 import init_data
 import routes
-
+import backend_celery.celery_schedule
 if __name__ == '__main__':
     app.run(debug=True)

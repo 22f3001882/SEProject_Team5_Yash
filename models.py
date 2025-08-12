@@ -118,7 +118,7 @@ class PocketMoney(db.Model):
     recurring = db.Column(db.Boolean, default=False)
     recurring_schedule = db.Column(db.String(50))  # 'weekly', 'monthly', etc.
     stored_in = db.Column(db.String(100))  # 'wallet', 'bank_account', etc.
-
+    
 class PocketMoneyLog(db.Model):
     __tablename__ = 'pocket_money_logs'
     
